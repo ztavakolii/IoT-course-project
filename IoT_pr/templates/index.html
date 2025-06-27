@@ -47,6 +47,8 @@
 <!-- Check-In Section -->
  <div id="user-info" class="hidden" style="margin-bottom: 15px; text-align: right;">
   <strong>کاربر:</strong> <span id="user-full-name"></span> (<span id="user-student-number"></span>)
+  <br>
+  <strong>امتیاز:</strong> <span id="user-score"></span>
 </div>
 <div id="checkin-section" class="hidden">
   <h3>ثبت حضور</h3>
@@ -56,16 +58,45 @@
   <button onclick="logout()">خروج</button>
   <p id="checkin-message"></p>
 </div>
+<!-- Check-out-Section -->
+<div id="checkout-section" class="hidden">
+  <h3> حضور ثبت شده است</h3>
+  <button onclick="checkout()">آزاد کردن میز</button>
+  <p id="checkout-message"></p>
+</div>
+
+<!-- sweetalert library -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+function checkAlerts(user_id) {
+  fetch(`/alerts/${user_id}`)
+    .then(res => res.json())
+    .then(data => {
+      if (data.alerts.length > 0) {
+        data.alerts.forEach(alert => {
+          Swal.fire({
+            icon: 'warning',
+            title: 'هشدار انضباطی!',
+            text: alert.message,
+            confirmButtonText: 'فهمیدم'
+          });
+        });
+      }
+    });
+}
+</script>
 
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script>
-  let currentUserId = null;
   let html5QrCode;
 
   function showLogin() {
     document.getElementById('login-form').classList.remove('hidden');
     document.getElementById('register-form').classList.add('hidden');
     document.getElementById('checkin-section').classList.add('hidden');
+    document.getElementById('checkout-section').classList.add('hidden');
+
     clearMessages();
   }
 
@@ -73,6 +104,8 @@
     document.getElementById('register-form').classList.remove('hidden');
     document.getElementById('login-form').classList.add('hidden');
     document.getElementById('checkin-section').classList.add('hidden');
+    document.getElementById('checkout-section').classList.add('hidden');
+
     clearMessages();
   }
 
@@ -82,7 +115,22 @@ function showCheckin() {
   document.getElementById('buttons').classList.add('hidden');
   document.getElementById('checkin-section').classList.remove('hidden');
   document.getElementById('user-info').classList.remove('hidden');
+  document.getElementById('checkout-section').classList.add('hidden');
+  document.getElementById('user-score').textContent = currentUserStudentPoint;
+  document.getElementById('user-full-name').textContent = currentUserFullName;
+  document.getElementById('user-student-number').textContent = currentUserStudentNumber;
 
+  clearMessages();
+}
+
+function showCheckout() {
+  document.getElementById('login-form').classList.add('hidden');
+  document.getElementById('register-form').classList.add('hidden');
+  document.getElementById('buttons').classList.add('hidden');
+  document.getElementById('checkin-section').classList.add('hidden');
+  document.getElementById('checkout-section').classList.remove('hidden');
+  document.getElementById('user-info').classList.remove('hidden');
+  document.getElementById('user-score').textContent = currentUserStudentPoint;
   document.getElementById('user-full-name').textContent = currentUserFullName;
   document.getElementById('user-student-number').textContent = currentUserStudentNumber;
 
@@ -90,9 +138,8 @@ function showCheckin() {
 }
 
 
-
   function clearMessages() {
-    ['login-message', 'register-message', 'checkin-message'].forEach(id => {
+    ['login-message', 'register-message', 'checkin-message','checkout-message'].forEach(id => {
       const el = document.getElementById(id);
       el.textContent = '';
       el.className = '';
@@ -104,8 +151,6 @@ function showCheckin() {
     el.textContent = msg;
     el.className = 'message ' + (success ? 'success' : 'fail');
   }
-  let currentUserFullName = '';
-  let currentUserStudentNumber = '';
 
   function login() {
   const student_number = document.getElementById('login-student_number').value.trim();
@@ -127,6 +172,7 @@ function showCheckin() {
       currentUserId = data.user_id;
       currentUserFullName = data.full_name;
       currentUserStudentNumber = data.student_number;
+      currentUserStudentPoint= data.score
 
       showMessage('login-message', 'ورود موفق! در حال انتقال...', true);
       setTimeout(() => {
@@ -186,6 +232,28 @@ function logout() {
   if (html5QrCode) html5QrCode.stop().catch(() => {});
 }
 
+function checkout() {
+  
+  fetch('/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === 'success') {
+        showMessage('checkout-message', 'میز آزاد شد.', true);
+        setTimeout(() => {
+        showCheckin();
+      }, 1000);
+
+      } else {
+        showMessage('checkout-message', data.message || 'خطا در آزاد کردن میز', false);
+      }
+    })
+    .catch(() => showMessage('checkout-message', 'خطا در اتصال به سرور', false));  
+  if (html5QrCode) html5QrCode.stop().catch(() => {});
+}
 
   function startQRScan() {
     if (html5QrCode) {
@@ -219,6 +287,9 @@ function handleQRUpload(file) {
   .then(data => {
     if (data.status === 'success') {
       showMessage('checkin-message', 'ثبت حضور با موفقیت انجام شد', true);
+      showCheckout();
+      session_id=data.session_id;
+
     } else {
       showMessage('checkin-message', data.message || 'خطا در اسکن QR', false);
     }
