@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+  <meta charset="UTF-8" />
+  <title>سامانه سالن مطالعه</title>
+  <style>
+    body { font-family: Tahoma, sans-serif; direction: rtl; max-width: 400px; margin: 20px auto; }
+    input, button { padding: 8px; margin: 5px 0; width: 100%; box-sizing: border-box; }
+   .hidden {
+     display: none !important;
+   } 
+    .message { margin: 10px 0; padding: 10px; border-radius: 4px; }
+    .success { background-color: #d4edda; color: #155724; }
+    .fail { background-color: #f8d7da; color: #721c24; }
+    .switch-buttons { display: flex; justify-content: space-around; margin-bottom: 15px; }
+    .switch-buttons button { width: 45%; }
+    #qr-reader { margin-top: 15px; }
+  </style>
+</head>
+<body>
+
+<h2>سامانه سالن مطالعه</h2>
+
+<div class="switch-buttons" id="buttons">
+  <button onclick="showLogin()">ورود</button>
+  <button onclick="showRegister()">ثبت‌نام</button>
+</div>
+
+<!-- Login Form -->
+<div id="login-form">
+  <input type="text" id="login-student_number" placeholder="شماره دانشجویی" />
+  <input type="password" id="login-password" placeholder="رمز عبور" />
+  <button onclick="login()">ورود</button>
+  <p id="login-message"></p>
+</div>
+
+<!-- Register Form -->
+<div id="register-form" class="hidden">
+  <input type="text" id="register-student_number" placeholder="شماره دانشجویی" />
+  <input type="text" id="register-full_name" placeholder="نام کامل" />
+  <input type="password" id="register-password" placeholder="رمز عبور" />
+  <input type="password" id="register-password-confirm" placeholder="تأیید رمز عبور" />
+  <button onclick="register()">ثبت‌نام</button>
+  <p id="register-message"></p>
+</div>
+
+<!-- Check-In Section -->
+ <div id="user-info" class="hidden" style="margin-bottom: 15px; text-align: right;">
+  <strong>کاربر:</strong> <span id="user-full-name"></span> (<span id="user-student-number"></span>)
+  <br>
+  <strong>امتیاز:</strong> <span id="user-score"></span>
+</div>
+<div id="checkin-section" class="hidden">
+  <h3>ثبت حضور</h3>
+  <button onclick="startQRScan()">اسکن کد QR</button>
+  <input type="file" accept="image/*" onchange="handleQRUpload(this.files[0])">
+  <div id="qr-reader" style="width:300px; height:300px;"></div>
+  <button onclick="logout()">خروج</button>
+  <p id="checkin-message"></p>
+</div>
+<!-- Check-out-Section -->
+<div id="checkout-section" class="hidden">
+  <h3> حضور ثبت شده است</h3>
+  <button onclick="checkout()">آزاد کردن میز</button>
+  <p id="checkout-message"></p>
+</div>
+
+<!-- sweetalert library -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+function checkAlerts(user_id) {
+  fetch(`/alerts/${user_id}`)
+    .then(res => res.json())
+    .then(data => {
+      if (data.alerts.length > 0) {
+        data.alerts.forEach(alert => {
+          Swal.fire({
+            icon: 'warning',
+            title: 'هشدار انضباطی!',
+            text: alert.message,
+            confirmButtonText: 'فهمیدم'
+          });
+        });
+      }
+    });
+}
+</script>
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script>
+  let html5QrCode;
+
+  function showLogin() {
+    document.getElementById('login-form').classList.remove('hidden');
+    document.getElementById('register-form').classList.add('hidden');
+    document.getElementById('checkin-section').classList.add('hidden');
+    document.getElementById('checkout-section').classList.add('hidden');
+
+    clearMessages();
+  }
+
+  function showRegister() {
+    document.getElementById('register-form').classList.remove('hidden');
+    document.getElementById('login-form').classList.add('hidden');
+    document.getElementById('checkin-section').classList.add('hidden');
+    document.getElementById('checkout-section').classList.add('hidden');
+
+    clearMessages();
+  }
+
+function showCheckin() {
+  document.getElementById('login-form').classList.add('hidden');
+  document.getElementById('register-form').classList.add('hidden');
+  document.getElementById('buttons').classList.add('hidden');
+  document.getElementById('checkin-section').classList.remove('hidden');
+  document.getElementById('user-info').classList.remove('hidden');
+  document.getElementById('checkout-section').classList.add('hidden');
+  document.getElementById('user-score').textContent = currentUserStudentPoint;
+  document.getElementById('user-full-name').textContent = currentUserFullName;
+  document.getElementById('user-student-number').textContent = currentUserStudentNumber;
+
+  clearMessages();
+}
+
+function showCheckout() {
+  document.getElementById('login-form').classList.add('hidden');
+  document.getElementById('register-form').classList.add('hidden');
+  document.getElementById('buttons').classList.add('hidden');
+  document.getElementById('checkin-section').classList.add('hidden');
+  document.getElementById('checkout-section').classList.remove('hidden');
+  document.getElementById('user-info').classList.remove('hidden');
+  document.getElementById('user-score').textContent = currentUserStudentPoint;
+  document.getElementById('user-full-name').textContent = currentUserFullName;
+  document.getElementById('user-student-number').textContent = currentUserStudentNumber;
+
+  clearMessages();
+}
+
+
+  function clearMessages() {
+    ['login-message', 'register-message', 'checkin-message','checkout-message'].forEach(id => {
+      const el = document.getElementById(id);
+      el.textContent = '';
+      el.className = '';
+    });
+  }
+
+  function showMessage(id, msg, success) {
+    const el = document.getElementById(id);
+    el.textContent = msg;
+    el.className = 'message ' + (success ? 'success' : 'fail');
+  }
+
+  function login() {
+  const student_number = document.getElementById('login-student_number').value.trim();
+  const password = document.getElementById('login-password').value.trim();
+
+  if (!student_number || !password) {
+    showMessage('login-message', 'لطفاً شماره دانشجویی و رمز را وارد کنید', false);
+    return;
+  }
+
+  fetch('/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ student_number, password })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.status === 'success') {
+      currentUserId = data.user_id;
+      currentUserFullName = data.full_name;
+      currentUserStudentNumber = data.student_number;
+      currentUserStudentPoint= data.score
+
+      showMessage('login-message', 'ورود موفق! در حال انتقال...', true);
+      setTimeout(() => {
+        showCheckin();
+      }, 1000);
+    }
+
+    else {
+      showMessage('login-message', 'نام کاربری یا رمز اشتباه است', false);
+    }
+  })
+  .catch(() => showMessage('login-message', 'خطا در اتصال به سرور', false));
+}
+
+  function register() {
+    const student_number = document.getElementById('register-student_number').value.trim();
+    const full_name = document.getElementById('register-full_name').value.trim();
+    const password = document.getElementById('register-password').value.trim();
+    const confirm = document.getElementById('register-password-confirm').value.trim();
+
+    if (!student_number || !full_name || !password || !confirm) {
+      showMessage('register-message', 'لطفاً همه فیلدها را پر کنید', false);
+      return;
+    }
+
+    if (password !== confirm) {
+      showMessage('register-message', 'رمز عبور و تأیید آن یکسان نیستند', false);
+      return;
+    }
+
+    fetch('/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ student_number, full_name, password })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === 'success') {
+        showMessage('register-message', 'ثبت‌نام موفق! حالا وارد شوید.', true);
+        setTimeout(showLogin, 2000);
+      } else {
+        showMessage('register-message', data.message || 'خطا در ثبت‌نام', false);
+      }
+    })
+    .catch(() => showMessage('register-message', 'خطا در اتصال به سرور', false));
+  }
+
+function logout() {
+  currentUserId = null;
+  currentUserFullName = '';
+  currentUserStudentNumber = '';
+  
+  document.getElementById('buttons').classList.remove('hidden');
+  document.getElementById('user-info').classList.add('hidden');
+  showLogin();
+  
+  if (html5QrCode) html5QrCode.stop().catch(() => {});
+}
+
+function checkout() {
+  
+  fetch('/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === 'success') {
+        showMessage('checkout-message', 'میز آزاد شد.', true);
+        setTimeout(() => {
+        showCheckin();
+      }, 1000);
+
+      } else {
+        showMessage('checkout-message', data.message || 'خطا در آزاد کردن میز', false);
+      }
+    })
+    .catch(() => showMessage('checkout-message', 'خطا در اتصال به سرور', false));  
+  if (html5QrCode) html5QrCode.stop().catch(() => {});
+}
+
+  function startQRScan() {
+    if (html5QrCode) {
+      html5QrCode.clear();
+    }
+
+    html5QrCode = new Html5Qrcode("qr-reader");
+
+    html5QrCode.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: 250 },
+      (decodedText) => {
+        html5QrCode.stop();
+        const data = parseQRData(decodedText);
+        sendCheckinFromQR(data);
+      },
+      (error) => {}
+    );
+  }
+
+function handleQRUpload(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('user_id', currentUserId);
+
+  fetch('/checkin_qr', {
+    method: 'POST',
+    body: formData
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.status === 'success') {
+      showMessage('checkin-message', 'ثبت حضور با موفقیت انجام شد', true);
+      showCheckout();
+      session_id=data.session_id;
+
+    } else {
+      showMessage('checkin-message', data.message || 'خطا در اسکن QR', false);
+    }
+  })
+  .catch(() => showMessage('checkin-message', 'خطا در ارتباط با سرور', false));
+}
+
+</script>
+
+</body>
+</html>
