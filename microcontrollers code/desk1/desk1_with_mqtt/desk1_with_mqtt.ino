@@ -4,8 +4,8 @@
 
 const char* ssid="IoT net";
 const char* password="IoT_123456";
-const char* mqttServer="mqtt.thingsboard.cloud";
-const char* token="dqk35ta0qmyys38w3nzj"; // desk1 token
+const char* mqttServer="thingsboard.cloud";
+const char* token="cf51vwkvj6rc7e64hhu7"; // desk1 token
 
 // pins
 #define PIR_PIN D1
@@ -132,11 +132,3 @@ void callback(char*topic,byte* payload,unsigned int length){
 
   }
 }
-
-
-
-
-
-
-
-
