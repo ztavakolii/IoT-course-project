@@ -64,40 +64,43 @@
   <button onclick="checkout()">آزاد کردن میز</button>
   <p id="checkout-message"></p>
   <div id="desk-data-container"></div>
-
-<script>
-functiofetch('/desk-data')
-    .then(response => response.json())
-    .then(data => {
-        if (!data || !data.id) {
-            document.getElementById('desk-data-container').innerHTML = `<p>${data.message || 'میز فعالی یافت نشد'}</p>`;
-            return;
-        }
-
-        let html = '<table border="1"><tr><th>میز</th><th>ناحیه</th><th>اطلاعات</th></tr>';
-        html += `<tr>
-                    <td>${data.id}</td>
-                    <td>${data.zone}</td>
-                    <td>${data.comment || '---'}</td>
-                </tr>`;
-        html += '</table>';
-
-        document.getElementById('desk-data-container').innerHTML = html;
-    })
-    .catch(error => {
-        document.getElementById('desk-data-container').innerHTML = `<p>خطا در ارتباط با سرور</p>`;
-        console.error("Error fetching desk data:", error);
-    });    
-
-fetchDeskData();
-setInterval(fetchDeskData, 60000);
-</script>
-
 </div>
+<script>
+function fetchDeskData() {
+    fetch('/desk-data')
+        .then(response => response.json())
+        .then(data => {
+            if (!data || !data.id) {
+                document.getElementById('desk-data-container').innerHTML = `<p>${data.message || 'میز فعالی یافت نشد'}</p>`;
+                return;
+            }
 
+            let html = `
+                <table border="1">
+                    <tr>
+                        <th>میز</th>
+                        <th>ناحیه</th>
+  
+                    </tr>
+                    <tr>
+                        <td>${data.id}</td>
+                        <td>${data.zone}</td>
+                        <td>${data.comment || '---'}</td>
+                    </tr>
+                </table>
+            `;
+
+            document.getElementById('desk-data-container').innerHTML = html;
+        })
+        .catch(error => {
+            document.getElementById('desk-data-container').innerHTML = `<p>خطا در ارتباط با سرور</p>`;
+            console.error("Error fetching desk data:", error);
+        });
+}
+
+</script>
 <!-- sweetalert library -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
 <script>
 function checkAlerts(user_id) {
   fetch(`/alerts/${user_id}`)
@@ -152,6 +155,7 @@ function showCheckin() {
 
   clearMessages();
 }
+let deskIntervalId = null;
 
 function showCheckout() {
   document.getElementById('login-form').classList.add('hidden');
@@ -163,8 +167,13 @@ function showCheckout() {
   document.getElementById('user-score').textContent = currentUserStudentPoint;
   document.getElementById('user-full-name').textContent = currentUserFullName;
   document.getElementById('user-student-number').textContent = currentUserStudentNumber;
-
   clearMessages();
+  fetchDeskData();
+  
+  setInterval(fetchDeskData, 60000);
+  if (!deskIntervalId) {
+    deskIntervalId = setInterval(fetchDeskData, 60000);
+  }
 }
 
 
@@ -273,6 +282,10 @@ function checkout() {
     .then(data => {
       if (data.status === 'success') {
         showMessage('checkout-message', 'میز آزاد شد.', true);
+        if (deskIntervalId) {
+          clearInterval(deskIntervalId);
+          deskIntervalId = null;
+          }
         setTimeout(() => {
         showCheckin();
       }, 1000);
