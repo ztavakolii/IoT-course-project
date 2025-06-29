@@ -63,6 +63,36 @@
   <h3> حضور ثبت شده است</h3>
   <button onclick="checkout()">آزاد کردن میز</button>
   <p id="checkout-message"></p>
+  <div id="desk-data-container"></div>
+
+<script>
+functiofetch('/desk-data')
+    .then(response => response.json())
+    .then(data => {
+        if (!data || !data.id) {
+            document.getElementById('desk-data-container').innerHTML = `<p>${data.message || 'میز فعالی یافت نشد'}</p>`;
+            return;
+        }
+
+        let html = '<table border="1"><tr><th>میز</th><th>ناحیه</th><th>اطلاعات</th></tr>';
+        html += `<tr>
+                    <td>${data.id}</td>
+                    <td>${data.zone}</td>
+                    <td>${data.comment || '---'}</td>
+                </tr>`;
+        html += '</table>';
+
+        document.getElementById('desk-data-container').innerHTML = html;
+    })
+    .catch(error => {
+        document.getElementById('desk-data-container').innerHTML = `<p>خطا در ارتباط با سرور</p>`;
+        console.error("Error fetching desk data:", error);
+    });    
+
+fetchDeskData();
+setInterval(fetchDeskData, 60000);
+</script>
+
 </div>
 
 <!-- sweetalert library -->

@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, session
 from flask_cors import CORS
 from models import db, User, Desk, Session, Alert,Device,Zone
 from datetime import datetime
@@ -11,6 +11,7 @@ import requests
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.secret_key = 'SECRETE'
 db.init_app(app)
 CORS(app)
 
@@ -64,6 +65,7 @@ def login():
 
     user = User.query.filter_by(student_number=student_number).first()
     if user and check_password_hash(user.password_hash, password):
+        session['user_id'] = user.id
         return jsonify({
             'status': 'success',
             'user_id': user.id,
@@ -122,17 +124,20 @@ def checkin_qr():
         if not user or not desk:
             return jsonify({'status': 'fail', 'message': 'User or Desk not found'}), 404
 
-        try:
-            requests.post(f"{desk_ip}/reserve", json={"token": token})
-        except Exception as e:
-            print(f"Failed to notify desk {desk_id}: {e}")
-            return jsonify({'status': 'success', 'message': 'Checked in via QR', 'session_id': session.id})
-        
-        session = Session(user_id=user.id, desk_id=desk.id, start_time=datetime.utcnow())
-        db.session.add(session)
+        #try:
+        #    requests.post(f"{desk_ip}/reserve", json={"token": token})
+
+        #except Exception as e:
+        #    print(f"Failed to notify desk {desk_id}: {e}")
+        #    return jsonify({'status': 'fail', 'message': str(e)}), 500
+
+        ses = Session(user_id=user.id, desk_id=desk.id, start_time=datetime.utcnow())
+        db.session.add(ses)
         desk.status = 'occupied'
         desk.last_present_time = datetime.utcnow()
         db.session.commit()
+        return jsonify({'status': 'success', 'message': 'Checked in via QR', 'session_id': ses.id})
+
 
     except Exception as e:
         return jsonify({'status': 'fail', 'message': str(e)}), 500
@@ -177,49 +182,45 @@ def checkout():
     db.session.commit()
     return jsonify({'status': 'success', 'message': 'Checked out'})
 
-@app.route('/violation', methods=['POST'])
-def add_violation():
-    data = request.json
-    user_id = data.get('user_id')
-    desk_id = data.get('desk_id')
-    violation_type = data.get('type')
-    zone_id = data.get('zone_id')
-    session_id = data.get('session_id')
+#@app.route('/violation', methods=['POST'])
+#def add_violation():
+#    data = request.json
+#    user_id = data.get('user_id')
+#    desk_id = data.get('desk_id')
+#    violation_type = data.get('type')
+#   zone_id = data.get('zone_id')
+#    session_id = data.get('session_id')
 
-    if not user_id or not desk_id or not violation_type or not zone_id:
-        return jsonify({'status': 'fail', 'message': 'Missing parameters'}), 400
-
-    alert = Alert(
-        alert_type=violation_type,
-        desk_id=desk_id,
-        zone_id=zone_id,
-        session_id=session_id,
-        time=datetime.utcnow()
-    )
-    db.session.add(alert)
-    db.session.commit()
-    return jsonify({'status': 'success', 'message': 'Violation recorded'})
+#    if not user_id or not desk_id or not violation_type or not zone_id:
+#       return jsonify({'status': 'fail', 'message': 'Missing parameters'}), 400
+#
+#    alert = Alert(
+#        alert_type=violation_type,
+#        desk_id=desk_id,
+#        zone_id=zone_id,
+#        session_id=session_id,
+#        time=datetime.utcnow()
+#    )
+#   db.session.add(alert)
+#   db.session.commit()
+#    return jsonify({'status': 'success', 'message': 'Violation recorded'})
 
 @app.route('/sensor-data', methods=['POST'])
 def receive_sensor_data():
     try:
         data = request.json
-        desk_id = data.get("desk_id")
         token = data.get("token")
         alert_type = data.get("type")
 
-        if not desk_id or not token or not alert_type:
+        if  not token or not alert_type:
             return jsonify({'status': 'fail', 'message': 'Missing parameters'}), 400
 
         if AUTHORIZED_DEVICES.get(desk_id) != token:
             return jsonify({'status': 'fail', 'message': 'Unauthorized'}), 401
+        for id , tok in AUTHORIZED_DEVICES:
+            if tok==token:
+                desk_id=id
 
-        alert = Alert(
-            alert_type=alert_type,
-            desk_id=desk_id,
-            time=datetime.utcnow()
-        )
-        db.session.add(alert)
 
         if alert_type == "motion":
             session = Session.query.filter_by(desk_id=desk_id, end_time=None).first()
@@ -252,35 +253,83 @@ def receive_sensor_data():
                     session_id=session.id
                 )
                 db.session.add(violation_alert)
-        else:
-            session = Session.query.filter_by(desk_id=desk_id, end_time=None).first()
-            if session:
-                session.end_time = datetime.utcnow()
+                        
+                db.session.commit()
+                return jsonify({'status': 'success', 'message': 'Alert recorded'})
 
-                user = User.query.get(session.user_id)
-                if user:
-                    user.point = max(user.point - 100, 0)  
-                    violation_alert = Alert(
-                        alert_type="loud_voice",
-                        desk_id=desk_id,
-                        time=datetime.utcnow(),
-                        session_id=session.id
-                    )
-                    
-                    db.session.add(violation_alert)
-                ip=desk_ip_map['A1']
-                d_token=AUTHORIZED_DEVICES['A1']
-                d_id='A1'
-                try:
-                    requests.post(f"{ip}/buzz", json={"token": d_token})
-                except Exception as e:
-                    print(f"Failed to buzz desk {d_id}: {e}")
+        elif alert_type == "sound":
+            for id in [1,2]:
+                desk_id=id
+                session = Session.query.filter_by(desk_id=desk_id, end_time=None).first()
+                if session:
+                    session.end_time = datetime.utcnow()
 
-        db.session.commit()
-        return jsonify({'status': 'success', 'message': 'Alert recorded'})
+                    user = User.query.get(session.user_id)
+                    if user:
+                        user.point = max(user.point - 100, 0)  
+                        violation_alert = Alert(
+                            alert_type="loud_voice",
+                            desk_id=desk_id,
+                            time=datetime.utcnow(),
+                            session_id=session.id
+                        )
+                        
+                        db.session.add(violation_alert)
+                    if desk_id==1:
+                        ip=desk_ip_map['A1']
+                        d_token=AUTHORIZED_DEVICES['A1']
+                        d_id='A1'
+                    else:
+                        ip=desk_ip_map['A2']
+                        d_token=AUTHORIZED_DEVICES['A2']
+                        d_id='A2'
+
+                    try:
+                        requests.post(f"{ip}/buzz", json={"token": d_token})
+                    except Exception as e:
+                        print(f"Failed to buzz desk {d_id}: {e}")
+            
+                    db.session.commit()
+                    return jsonify({'status': 'success', 'message': 'Alert recorded'})
+            else:
+                temperature = data.get("temperature")
+                ppm = data.get("ppm")
+                for id in [1,2]:
+                    desk_id=id      
+                    desk = Desk.query.get(int(desk_id))
+                    if desk:
+                        desk.comment = f"دما: {temperature} °C | آلودگی: {ppm} PPM"
+                        db.session.commit()
+                    return jsonify({'status': 'success', 'message': 'Environment data recorded'})
 
     except Exception as e:
         return jsonify({'status': 'fail', 'message': str(e)}), 500
+    
+@app.route('/desk-data')
+def get_user_desk_data():
+    user_id = session.get("user_id")
+    if not user_id:
+        print("user")
+        return jsonify({"status": "fail", "message": "Unauthorized"}), 401
+
+    active_session = Session.query.filter_by(user_id=user_id, end_time=None).first()
+    if not active_session:
+        print("sess")
+
+        return jsonify([])
+
+    desk = Desk.query.get(active_session.desk_id)
+    if not desk:
+        print("desk")
+
+        return jsonify([])
+
+    result = {
+        "id": desk.id,
+        "zone": desk.zone.name if desk.zone else "",
+        "comment": desk.comment,
+    }
+    return jsonify(result)    
 
 @app.route('/alerts/<int:user_id>', methods=['GET'])
 def get_user_alerts(user_id):

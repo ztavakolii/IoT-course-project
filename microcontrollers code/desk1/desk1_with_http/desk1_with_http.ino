@@ -8,14 +8,25 @@ const char* ssid="IoT net";
 const char* password="IoT_123456";
 
 // pins
-#define PIR_PIN D1
+#define PIR_PIN D4
 #define BUZZER_PIN D2
 #define LED_PIN D3
 
 volatile bool deskOccupied=false;
-volatile unsigned long long lastMotionTime=0;
+volatile unsigned long lastMotionTime=0;
 volatile unsigned long TIMEOUT=1*60*1000;
+bool motion_detected=false;
+bool timeout_occurs=false;
+int motion=0;
+int tries=0;
 const int maxTries=1000;
+
+WiFiClient client;
+HTTPClient http;
+const char* serverURL="http://192.168.75.224:5000/sensor-data";
+String jsonData;
+int httpCode;
+
 
 // timer
 Ticker timer;
@@ -25,10 +36,8 @@ ESP8266WebServer server(80);
 
 // interrupt handler for PIR sensor
 void ICACHE_RAM_ATTR handlePIR(){
-  if(deskOccupied){
-  Serial.println("Motion detected!\n");
-  lastMotionTime=millis();
-  }
+  motion_detected=true;
+  
 }
 
 
@@ -46,7 +55,7 @@ void setup() {
 
   timer.attach_ms(60000,handleTimeout);
 
-  int tries=0;
+
   Serial.println("Connecting to ");
   Serial.println(ssid);
   Serial.println("\n");
@@ -69,49 +78,66 @@ void setup() {
   server.on("/release",HTTP_POST,handleRelease);
   server.on("/sound_alert",HTTP_POST,handleSoundAlert);
   server.begin();
-  Serial.println("HTTP server started.\n");
+  Serial.println("HTTP server started.");
 
 }
 
 void loop() {
-  server.handleClient();
-}
+  
+  if(motion_detected){
+  if(deskOccupied){
+  Serial.println("Motion detected!");
+  lastMotionTime=millis();
+  }
+  motion_detected=false;
+  }
 
-void handleTimeout(){
-
-  if(deskOccupied && (millis()-lastMotionTime>TIMEOUT)){
+  if(timeout_occurs){
+    if(deskOccupied && (millis()-lastMotionTime>TIMEOUT)){
     for(int i=0;i<3;i++){
       digitalWrite(BUZZER_PIN,HIGH);
       digitalWrite(LED_PIN,HIGH);
-      delay(500);
+      delay(50);
+    
       digitalWrite(BUZZER_PIN,LOW);
       digitalWrite(LED_PIN,LOW);
-      delay(500);
+      delay(50);
     }
-    Serial.println("Timeout occurs!(User was 20 minutes without motion)\n");
+    Serial.println("Timeout occurs!(User was 20 minutes without motion)");
+    
 
     if(WiFi.status()==WL_CONNECTED){
-        String jsonData="{\"type\":\"motion\",\"token\":\"abc123\"}";
-
-        WiFiClient client;
-        HTTPClient http;
-        const char* serverURL="http://192.168.75.224:5000/sensor-data";
+        jsonData="{\"type\":\"motion\",\"token\":\"abc123\"}";
+        
 
         http.begin(client,serverURL);
-        int httpCode=http.POST(jsonData);
+        httpCode=http.POST(jsonData);
         if(httpCode>0){
-          Serial.println("Motion status report was successful!\n");
+          Serial.println("Motion status report was successful!");
         }
-        
+        client.stop();
+        http.end();
     }
   }
+
+  timeout_occurs=false;
+  }
+
+
+  server.handleClient();
+
+  delay(500);
+}
+
+void handleTimeout(){
+  timeout_occurs=true;
 }
 
 
 void handleReserve(){
   deskOccupied=true;
   digitalWrite(LED_PIN,HIGH);
-  delay(500);
+  delay(100);
   digitalWrite(LED_PIN,LOW);
 
   lastMotionTime=millis();
@@ -120,7 +146,7 @@ void handleReserve(){
 void handleRelease(){
   deskOccupied=false;
   digitalWrite(LED_PIN,HIGH);
-  delay(500);
+  delay(100);
   digitalWrite(LED_PIN,LOW);
 
   lastMotionTime=0;
@@ -129,10 +155,10 @@ void handleRelease(){
 void handleSoundAlert(){
   digitalWrite(BUZZER_PIN,HIGH);
   digitalWrite(LED_PIN,HIGH);
-  delay(500);
+  delay(100);
   digitalWrite(BUZZER_PIN,LOW);
   digitalWrite(LED_PIN,LOW);
-  delay(500);
+  //delay(100);
 }
 
 

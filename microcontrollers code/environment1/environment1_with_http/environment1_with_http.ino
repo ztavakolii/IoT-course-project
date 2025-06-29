@@ -12,7 +12,15 @@ const char* password="IoT_123456";
 
 // environment1 token environment1 includes desk1 & desk2
 
+int tries=0;
 const int maxTries=1000;
+
+
+String jsonData;
+WiFiClient client;
+HTTPClient http;
+const char* serverURL="http://192.168.75.224:5000/sensor-data";
+int httpCode;
 
 
 #define SOUND_PIN D7
@@ -26,14 +34,14 @@ const int maxTries=1000;
 DHT dht(DHT_PIN,DHT_TYPE);
 
 // air quality sensor
- MQ135 gasSensor = MQ135(MQ135_PIN);
+MQ135 gasSensor = MQ135(MQ135_PIN);
 
 
 
 void setup() {
   dht.begin();
 
-  Serial.begin(9600);
+  Serial.begin(115200);
 
   pinMode(SOUND_PIN,INPUT);
   pinMode(COOLER_LED_PIN,OUTPUT);
@@ -48,8 +56,8 @@ void setup() {
   Serial.print("basic amount of RZero: ");
   Serial.println(ro);
 
-  int tries=0;
-  Serial.println("Connecting to ");
+  
+  Serial.print("Connecting to ");
   Serial.println(ssid);
   WiFi.begin(ssid,password);
   while(WiFi.status()!=WL_CONNECTED && tries<maxTries){
@@ -104,17 +112,15 @@ if(!isnan(temperature)&&!isnan(humidity)){
 }
 // send sound level to server to manage the users' behavior of that environment desks
   if(WiFi.status()==WL_CONNECTED && soundLevel>0){
-        String jsonData="{\"type\":\"sound\",\"token\":\"ghi789\"}";
-
-        WiFiClient client;
-        HTTPClient http;
-        const char* serverURL="http://192.168.75.224:5000/sensor-data";
+        jsonData="{\"type\":\"sound\",\"token\":\"ghi789\"}";
 
         http.begin(client,serverURL);
-        int httpCode=http.POST(jsonData);
+        httpCode=http.POST(jsonData);
         if(httpCode>0){
-          Serial.println("Motion status report was successful!\n");
+          Serial.print("Sound level status report was successful!\n");
         }
+        client.stop();
+        http.end();
         
     }
 
