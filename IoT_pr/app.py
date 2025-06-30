@@ -26,9 +26,9 @@ AUTHORIZED_DEVICES = {
     "A": "ghi789"
 }
 desk_ip_map = {
-    "A1": "http://192.168.75.106",
-    "A2": "http://192.168.1.11",
-    "A": "http://192.168.75.222"
+    "A1": "http://192.168.75.106:80",
+    "A2": "http://192.168.1.:80",
+    "A": "http://192.168.75.222:80"
 }
 
 @app.route('/')
@@ -124,12 +124,12 @@ def checkin_qr():
         if not user or not desk:
             return jsonify({'status': 'fail', 'message': 'User or Desk not found'}), 404
 
-        #try:
-        #    requests.post(f"{desk_ip}/reserve", json={"token": token})
+#        try:
+#           requests.post(f"{desk_ip}/reserve", json={"token": token})
 
-        #except Exception as e:
-        #    print(f"Failed to notify desk {desk_id}: {e}")
-        #    return jsonify({'status': 'fail', 'message': str(e)}), 500
+#        except Exception as e:
+#            print(f"Failed to notify desk {desk_id}: {e}")
+#            return jsonify({'status': 'fail', 'message': str(e)}), 500
 
         ses = Session(user_id=user.id, desk_id=desk.id, start_time=datetime.utcnow())
         db.session.add(ses)
@@ -298,7 +298,6 @@ def receive_sensor_data():
                     desk_id=id      
                     desk = Desk.query.get(int(desk_id))
                     if desk:
-                        desk.comment = f"دما: {temperature} °C | آلودگی: {ppm} PPM"
                         db.session.commit()
                     return jsonify({'status': 'success', 'message': 'Environment data recorded'})
 
@@ -311,12 +310,13 @@ def get_user_desk_data():
     if not user_id:
         print("user")
         return jsonify({"status": "fail", "message": "Unauthorized"}), 401
-
+    print(user_id)
     active_session = Session.query.filter_by(user_id=user_id, end_time=None).first()
     if not active_session:
         print("sess")
 
         return jsonify([])
+    print(active_session)
 
     desk = Desk.query.get(active_session.desk_id)
     if not desk:
@@ -329,6 +329,7 @@ def get_user_desk_data():
         "zone": desk.zone.name if desk.zone else "",
         "comment": desk.comment,
     }
+    print(result)
     return jsonify(result)    
 
 @app.route('/alerts/<int:user_id>', methods=['GET'])
