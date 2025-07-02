@@ -112,7 +112,7 @@ void loop() {
         http.begin(client,serverURL);
         http.addHeader("Content-Type", "application/json");
         httpCode=http.POST(jsonData);
-        if(httpCode>200 && httpCode <300){
+        if(httpCode>=200 && httpCode <300){
           Serial.println("Motion status report was successful!");
         }
         client.stop();
