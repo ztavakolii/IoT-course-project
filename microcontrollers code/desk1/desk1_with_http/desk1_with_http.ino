@@ -56,9 +56,8 @@ void setup() {
   timer.attach_ms(60000,handleTimeout);
 
 
-  Serial.println("Connecting to ");
+  Serial.print("Connecting to ");
   Serial.println(ssid);
-  Serial.println("\n");
   WiFi.begin(ssid,password);
   while(WiFi.status()!=WL_CONNECTED && tries<maxTries){
     delay(500);
@@ -66,10 +65,10 @@ void setup() {
     tries++;
   }
   if(WiFi.status()!= WL_CONNECTED){
-    Serial.println("WiFi disconnected!\n");
+    Serial.print("WiFi disconnected!\n");
   }
   else{
-    Serial.println("WiFi connected.\n");
+    Serial.print("WiFi connected.\n");
     Serial.println(WiFi.localIP());
   }
 
@@ -107,12 +106,13 @@ void loop() {
     
 
     if(WiFi.status()==WL_CONNECTED){
-        jsonData="{\"type\":\"motion\",\"token\":\"abc123\"}";
+        jsonData="{\"token\":\"abc123\",\"type\":\"motion\"}";
         
 
         http.begin(client,serverURL);
+        http.addHeader("Content-Type", "application/json");
         httpCode=http.POST(jsonData);
-        if(httpCode>0){
+        if(httpCode>200 && httpCode <300){
           Serial.println("Motion status report was successful!");
         }
         client.stop();
@@ -137,19 +137,30 @@ void handleTimeout(){
 void handleReserve(){
   deskOccupied=true;
   digitalWrite(LED_PIN,HIGH);
+  digitalWrite(BUZZER_PIN,HIGH);
   delay(100);
   digitalWrite(LED_PIN,LOW);
+  digitalWrite(BUZZER_PIN,LOW);
+
 
   lastMotionTime=millis();
+  Serial.println("The desk is reserved.");
+  server.send(200, "text/plain", "OK");
 }
 
 void handleRelease(){
   deskOccupied=false;
   digitalWrite(LED_PIN,HIGH);
+  digitalWrite(BUZZER_PIN,HIGH);
   delay(100);
   digitalWrite(LED_PIN,LOW);
+  digitalWrite(BUZZER_PIN,LOW);
+
 
   lastMotionTime=0;
+  Serial.println("The desk is released.");
+
+  server.send(200, "text/plain", "OK");
 }
 
 void handleSoundAlert(){
@@ -159,6 +170,8 @@ void handleSoundAlert(){
   digitalWrite(BUZZER_PIN,LOW);
   digitalWrite(LED_PIN,LOW);
   //delay(100);
+  Serial.println("Sound Alert!");
+  server.send(200, "text/plain", "OK");
 }
 
 
