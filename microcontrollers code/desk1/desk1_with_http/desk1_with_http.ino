@@ -106,7 +106,7 @@ void loop() {
     
 
     if(WiFi.status()==WL_CONNECTED){
-        jsonData="{\"token\":\"abc123\",\"type\":\"motion\"}";
+        jsonData="{\"desk_id\":\"A1\",\"token\":\"abc123\",\"type\":\"motion\"}";
         
 
         http.begin(client,serverURL);
