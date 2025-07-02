@@ -2,6 +2,7 @@
 <html lang="fa">
 <head>
   <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>سامانه سالن مطالعه</title>
   <style>
   @import url('https://cdn.fontcdn.ir/Font/Persian/Vazirmatn/Vazirmatn.css');
@@ -18,6 +19,8 @@
     cursor: default;
     background-image: url("{{ url_for('static', filename='study_hall_background.png') }}");
     background-size: cover;
+    background-repeat: no-repeat;
+    height: 100vh;
 
   }
 
@@ -251,7 +254,6 @@ function fetchDeskData() {
             console.error("Error fetching desk data:", error);
         });
 }
-
 </script>
 <!-- sweetalert library -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>

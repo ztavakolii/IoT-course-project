@@ -211,36 +211,31 @@ def checkout():
 def receive_sensor_data():
     try:
         data = request.json
+        desk_id=data.get("desk_id")
         token = data.get("token")
         alert_type = data.get("type")
 
-        if not token or not alert_type:
+        if  not desk_id or not token or not alert_type:
             return jsonify({'status': 'fail', 'message': 'Missing parameters'}), 400
-
-        desk_id=0
-        for id , tok in AUTHORIZED_DEVICES.items():
-            if tok==token:
-                desk_id=id
-
-        if desk_id== 0:
-            return jsonify({'status': 'fail', 'message': 'Unauthorized'}), 401
 
         if AUTHORIZED_DEVICES.get(desk_id) != token:
             return jsonify({'status': 'fail', 'message': 'Unauthorized'}), 401
-
+        if desk_id == "A1":
+            id=1
+        elif desk_id=="A2":
+            id=2
         if alert_type == "motion":
-            session = Session.query.filter_by(desk_id=desk_id, end_time=None).first()
+            session = Session.query.filter_by(desk_id=id, end_time=None).first()
             if session:
                 session.end_time = datetime.utcnow()
-
                 user = User.query.get(session.user_id)
                 if user:
                     user.point = max(user.point - 100, 0)  
-                desk = Desk.query.get(desk_id)
+                desk = Desk.query.get(id)
                 if desk:
                     desk.status = 'free'
 
-                    if desk_id == "1":
+                    if id == 1:
                         desk_ip = desk_ip_map['A1']
                         token = AUTHORIZED_DEVICES['A1']
                     else:
@@ -254,17 +249,17 @@ def receive_sensor_data():
 
                 violation_alert = Alert(
                     alert_type="user_left_without_checkout",
-                    desk_id=desk_id,
+                    desk_id=desk.id,
                     time=datetime.utcnow(),
                     session_id=session.id
                 )
                 db.session.add(violation_alert)
                         
                 db.session.commit()
-            
                 return jsonify({'status': 'success', 'message': 'Alert recorded'})
             else:
                 return jsonify({'status': 'fail', 'message': 'No active session'}), 400
+            
         elif alert_type == "sound":
             for id in [1,2]:
                 desk_id=id
@@ -307,7 +302,7 @@ def receive_sensor_data():
                 ppm = data.get("ppm")
                 for id in [1,2]:
                     desk_id=id      
-                    desk = Desk.query.get(int(desk_id))
+                    desk = Desk.query.get(desk_id)
                     if desk:
                         db.session.commit()
                     return jsonify({'status': 'success', 'message': 'Environment data recorded'})
