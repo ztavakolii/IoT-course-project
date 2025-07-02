@@ -4,20 +4,151 @@
   <meta charset="UTF-8" />
   <title>سامانه سالن مطالعه</title>
   <style>
-    body { font-family: Tahoma, sans-serif; direction: rtl; max-width: 400px; margin: 20px auto; }
-    input, button { padding: 8px; margin: 5px 0; width: 100%; box-sizing: border-box; }
-   .hidden {
-     display: none !important;
-   } 
-    .message { margin: 10px 0; padding: 10px; border-radius: 4px; }
-    .success { background-color: #d4edda; color: #155724; }
-    .fail { background-color: #f8d7da; color: #721c24; }
-    .switch-buttons { display: flex; justify-content: space-around; margin-bottom: 15px; }
-    .switch-buttons button { width: 45%; }
-    #qr-reader { margin-top: 15px; }
-  </style>
+  @import url('https://cdn.fontcdn.ir/Font/Persian/Vazirmatn/Vazirmatn.css');
+
+  body {
+    font-family: 'Vazirmatn', Tahoma, sans-serif;
+    direction: rtl;
+    max-width: 500px;
+    margin: 40px auto;
+    padding: 25px;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    background-color: rgb(132, 222, 238);
+    cursor: default;
+    background-image: url("{{ url_for('static', filename='study_hall_background.png') }}");
+    background-size: cover;
+
+  }
+
+  h2, h3 {
+    text-align: center;
+    color: #4e4e4e;
+    margin-bottom: 20px;
+  }
+
+  input, button {
+    padding: 12px;
+    margin: 8px 0;
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    font-size: 15px;
+    transition: all 0.25s ease;
+    cursor: text;
+  }
+
+  input:focus {
+    border-color: #81d4fa;
+    box-shadow: 0 0 5px rgba(129, 212, 250, 0.6);
+    outline: none;
+  }
+
+ button {
+  background: #c8e6c9; /* سبز ملایم */
+  color: #333;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+button:hover {
+  background: #a5d6a7; /* سبز hover ملایم‌تر */
+  transform: scale(1.02);
+}
+
+.switch-buttons button {
+  background: #b3e5fc; /* آبی روشن ملایم */
+  color: #333;
+}
+
+.switch-buttons button:hover {
+  background: #81d4fa; /* آبی کمی پررنگ‌تر */
+}
+
+
+  .hidden {
+    display: none !important;
+  }
+
+  .message {
+    padding: 10px 14px;
+    border-radius: 8px;
+    margin-top: 10px;
+    font-size: 14px;
+  }
+
+  .success {
+    background-color: #e0f2f1;
+    color: #00695c;
+    border: 1px solid #b2dfdb;
+  }
+
+  .fail {
+    background-color: #ffebee;
+    color: #c62828;
+    border: 1px solid #ef9a9a;
+  }
+.main-box {
+  background-color: rgba(255, 255, 255, 0.9); /* پس‌زمینه روشن و قابل خواندن */
+  padding: 30px;
+  border-radius: 16px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+  max-width: 500px;
+  margin: 50px auto;
+}
+
+  #qr-reader {
+    margin-top: 15px;
+    border: 1px solid #ccc;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  table {
+    width: 100%;
+    margin-top: 10px;
+    border-collapse: collapse;
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: #fafafa;
+  }
+
+  table th, table td {
+    border: 1px solid #ddd;
+    padding: 10px;
+    text-align: center;
+  }
+
+  table th {
+    background-color: #e1f5fe;
+    color: #444;
+  }
+
+  #user-info {
+    background: #f1f8e9;
+    padding: 10px 15px;
+    border-radius: 10px;
+    border: 1px solid #dcedc8;
+    margin-bottom: 20px;
+  }
+
+  input, button {
+    cursor: pointer;
+  }
+
+  input:focus, button:focus {
+    outline: none;
+  }
+</style>
+
+
 </head>
 <body>
+<div class="main-box">
 
 <h2>سامانه سالن مطالعه</h2>
 
@@ -25,45 +156,68 @@
   <button onclick="showLogin()">ورود</button>
   <button onclick="showRegister()">ثبت‌نام</button>
 </div>
+</body>
+</div>
+
+
 
 <!-- Login Form -->
+
 <div id="login-form">
+     <div class="main-box">
+
   <input type="text" id="login-student_number" placeholder="شماره دانشجویی" />
   <input type="password" id="login-password" placeholder="رمز عبور" />
   <button onclick="login()">ورود</button>
   <p id="login-message"></p>
-</div>
+</div></div>
 
 <!-- Register Form -->
 <div id="register-form" class="hidden">
+    <div class="main-box">
+
   <input type="text" id="register-student_number" placeholder="شماره دانشجویی" />
   <input type="text" id="register-full_name" placeholder="نام کامل" />
   <input type="password" id="register-password" placeholder="رمز عبور" />
   <input type="password" id="register-password-confirm" placeholder="تأیید رمز عبور" />
   <button onclick="register()">ثبت‌نام</button>
   <p id="register-message"></p>
+    </div>
+
 </div>
+
 
 <!-- Check-In Section -->
  <div id="user-info" class="hidden" style="margin-bottom: 15px; text-align: right;">
+    <div class="main-box">
+
   <strong>کاربر:</strong> <span id="user-full-name"></span> (<span id="user-student-number"></span>)
   <br>
   <strong>امتیاز:</strong> <span id="user-score"></span>
+    </div>
+
 </div>
 <div id="checkin-section" class="hidden">
+    <div class="main-box">
+
   <h3>ثبت حضور</h3>
   <button onclick="startQRScan()">اسکن کد QR</button>
   <input type="file" accept="image/*" onchange="handleQRUpload(this.files[0])">
   <div id="qr-reader" style="width:300px; height:300px;"></div>
   <button onclick="logout()">خروج</button>
   <p id="checkin-message"></p>
+    </div>
 </div>
 <!-- Check-out-Section -->
 <div id="checkout-section" class="hidden">
+    <div class="main-box">
+
   <h3> حضور ثبت شده است</h3>
   <button onclick="checkout()">آزاد کردن میز</button>
   <p id="checkout-message"></p>
   <div id="desk-data-container"></div>
+    </div>
+
 </div>
 <script>
 function fetchDeskData() {

@@ -78,22 +78,24 @@ def login():
 
 @app.route('/checkin_qr', methods=['POST'])
 def checkin_qr():
-    if 'file' not in request.files or 'user_id' not in request.form:
-        return jsonify({'status': 'fail', 'message': 'Missing file or user_id'}), 400
+    user_id = request.form.get('user_id')
+    qr_data = None
 
-    file = request.files['file']
-    user_id = request.form['user_id']
-    
-    filename = secure_filename(file.filename)
-    filepath = os.path.join(UPLOAD_FOLDER, filename)
-    file.save(filepath)
-
-    qr_data = read_qr(filepath)
-    os.remove(filepath)
+    if 'qr_data' in request.form:
+        qr_data = request.form['qr_data']
+    elif 'file' in request.files:
+        file = request.files['file']
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
+        file.save(filepath)
+        qr_data = read_qr(filepath)
+        os.remove(filepath)
+    else:
+        return jsonify({'status': 'fail', 'message': 'Missing file or qr_data'}), 400
 
     if not qr_data:
         return jsonify({'status': 'fail', 'message': 'QR code not detected'}), 400
-
+    
     try:
         zone, desk_id = None, None
         parts = qr_data.split(';')
@@ -131,7 +133,7 @@ def checkin_qr():
             print(f"Failed to notify desk {desk_id}: {e}")
             return jsonify({'status': 'fail', 'message': str(e)}), 500
 
-        ses = Session(user_id=user.id, desk_id=desk.id, start_time=datetime.utcnow())
+        ses = Session(user_id=user.id, desk_id=desk.id, start_time=datetime.utcnow(),end_time=None)
         db.session.add(ses)
         desk.status = 'occupied'
         desk.last_present_time = datetime.utcnow()
@@ -212,7 +214,7 @@ def receive_sensor_data():
         token = data.get("token")
         alert_type = data.get("type")
 
-        if  not token or not alert_type:
+        if not token or not alert_type:
             return jsonify({'status': 'fail', 'message': 'Missing parameters'}), 400
 
         desk_id=0
