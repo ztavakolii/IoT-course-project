@@ -215,12 +215,16 @@ def receive_sensor_data():
         if  not token or not alert_type:
             return jsonify({'status': 'fail', 'message': 'Missing parameters'}), 400
 
-        if AUTHORIZED_DEVICES.get(desk_id) != token:
-            return jsonify({'status': 'fail', 'message': 'Unauthorized'}), 401
-        for id , tok in AUTHORIZED_DEVICES:
+        desk_id=0
+        for id , tok in AUTHORIZED_DEVICES.items():
             if tok==token:
                 desk_id=id
 
+        if desk_id== 0:
+            return jsonify({'status': 'fail', 'message': 'Unauthorized'}), 401
+
+        if AUTHORIZED_DEVICES.get(desk_id) != token:
+            return jsonify({'status': 'fail', 'message': 'Unauthorized'}), 401
 
         if alert_type == "motion":
             session = Session.query.filter_by(desk_id=desk_id, end_time=None).first()
@@ -229,7 +233,7 @@ def receive_sensor_data():
 
                 user = User.query.get(session.user_id)
                 if user:
-                    user.score = max(user.point - 100, 0)  
+                    user.point = max(user.point - 100, 0)  
                 desk = Desk.query.get(desk_id)
                 if desk:
                     desk.status = 'free'
@@ -255,8 +259,10 @@ def receive_sensor_data():
                 db.session.add(violation_alert)
                         
                 db.session.commit()
+            
                 return jsonify({'status': 'success', 'message': 'Alert recorded'})
-
+            else:
+                return jsonify({'status': 'fail', 'message': 'No active session'}), 400
         elif alert_type == "sound":
             for id in [1,2]:
                 desk_id=id
@@ -291,6 +297,9 @@ def receive_sensor_data():
             
                     db.session.commit()
                     return jsonify({'status': 'success', 'message': 'Alert recorded'})
+                else:
+                    return jsonify({'status': 'fail', 'message': 'No active session'}), 400
+
             else:
                 temperature = data.get("temperature")
                 ppm = data.get("ppm")
@@ -303,7 +312,8 @@ def receive_sensor_data():
 
     except Exception as e:
         return jsonify({'status': 'fail', 'message': str(e)}), 500
-    
+
+
 @app.route('/desk-data')
 def get_user_desk_data():
     user_id = session.get("user_id")
