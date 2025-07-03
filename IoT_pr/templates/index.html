@@ -197,6 +197,7 @@ button:hover {
   <strong>کاربر:</strong> <span id="user-full-name"></span> (<span id="user-student-number"></span>)
   <br>
   <strong>امتیاز:</strong> <span id="user-score"></span>
+  <button onclick="showAllAlerts()">نمایش همه هشدارها</button>
     </div>
 
 </div>
@@ -214,7 +215,6 @@ button:hover {
 <!-- Check-out-Section -->
 <div id="checkout-section" class="hidden">
     <div class="main-box">
-
   <h3> حضور ثبت شده است</h3>
   <button onclick="checkout()">آزاد کردن میز</button>
   <p id="checkout-message"></p>
@@ -255,28 +255,63 @@ function fetchDeskData() {
 }
 </script>
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-function checkAlerts() {
+function showAllAlerts() {
   fetch(`/alerts`)
-    .then(res => res.json())
-    .then(data => {
-      if (data.alerts.length > 0) {
-        const lastAlertTime = localStorage.getItem("lastAlertTime");
-        const newest = data.alerts[0];
-
-        if (!lastAlertTime || newest.time > lastAlertTime) {
-          Swal.fire({
-            icon: 'warning',
-            title: 'هشدار انضباطی!',
-            text: newest.message,
-            confirmButtonText: 'فهمیدم'
-          });
-
-          localStorage.setItem("lastAlertTime", newest.time);
-        }
+    .then(res => {
+      if (!res.ok) {
+        throw new Error('Failed to fetch alerts');
       }
+      return res.json();
+    })
+    .then(data => {
+      if (data.alerts.length === 0) {
+        Swal.fire({
+          icon: 'info',
+          title: 'هشدارها',
+          text: 'هیچ هشداری برای نمایش وجود ندارد.',
+          confirmButtonText: 'باشه'
+        });
+        return;
+      }
+
+      // Format alerts into an HTML list
+      const alertList = data.alerts.map(alert => `
+        <div style="text-align: right; margin-bottom: 10px;">
+          <strong>${new Date(alert.time).toLocaleString('fa-IR')}</strong>: ${alert.message}
+        </div>
+      `).join('');
+
+      Swal.fire({
+        icon: 'info',
+        title: 'همه هشدارها',
+        html: `<div style="text-align: right;">${alertList}</div>`,
+        confirmButtonText: 'بستن',
+        width: '600px',
+        customClass: {
+          popup: 'swal-rtl'
+        }
+      });
+    })
+    .catch(error => {
+      Swal.fire({
+        icon: 'error',
+        title: 'خطا',
+        text: 'خطایی در دریافت هشدارها رخ داد.',
+        confirmButtonText: 'باشه'
+      });
     });
 }
+// Optional: Add CSS for RTL support in SweetAlert2
+const style = document.createElement('style');
+style.innerHTML = `
+  .swal-rtl {
+    direction: rtl;
+    font-family: 'Vazir', 'Tahoma', sans-serif;
+  }
+`;
+document.head.appendChild(style);
 
 </script>
 <script src="https://unpkg.com/html5-qrcode"></script>
@@ -315,6 +350,7 @@ function showCheckin() {
   clearMessages();
 }
 let deskIntervalId = null;
+let session_id = null;
 
 function showCheckout() {
   document.getElementById('login-form').classList.add('hidden');
@@ -437,14 +473,10 @@ function logout() {
   });
 }
 
-
 function checkout() {
   
   fetch('/checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ session_id })
-    })
+  method: "POST"})
     .then(res => res.json())
     .then(data => {
       if (data.status === 'success') {
@@ -464,55 +496,83 @@ function checkout() {
     .catch(() => showMessage('checkout-message', 'خطا در اتصال به سرور', false));  
   if (html5QrCode) html5QrCode.stop().catch(() => {});
 }
-
-  function startQRScan() {
-    if (html5QrCode) {
-      html5QrCode.clear();
+function parseQRData(decodedText) {
+  // Parse QR data into an object
+  try {
+    const parts = decodedText.split(';');
+    const data = {};
+    for (const part of parts) {
+      if (part.includes(':')) {
+        const [key, value] = part.split(':', 2);
+        data[key.trim()] = value.trim();
+      }
     }
+    return data.zone && data.desk ? data : null;
+  } catch (error) {
+    console.error('Error parsing QR data:', error);
+    return null;
+  }
+}
 
-    html5QrCode = new Html5Qrcode("qr-reader");
-
-    html5QrCode.start(
-      { facingMode: "environment" },
-      { fps: 10, qrbox: 250 },
-      (decodedText) => {
-        html5QrCode.stop();
-        const data = parseQRData(decodedText);
-        sendCheckinFromQR(data);
-      },
-      (error) => {}
-    );
+function startQRScan() {
+  if (html5QrCode) {
+    html5QrCode.clear();
   }
 
+  html5QrCode = new Html5Qrcode("qr-reader");
+
+  html5QrCode.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: 250 },
+    (decodedText) => {
+      html5QrCode.stop().then(() => {
+        const data = parseQRData(decodedText);
+        if (data) {
+          sendCheckinFromQR(data);
+        } else {
+          showMessage('checkin-message', 'Invalid QR code format', false);
+        }
+      }).catch(err => console.error('Error stopping QR scanner:', err));
+    },
+    (error) => {
+      console.error('QR scan error:', error);
+      showMessage('checkin-message', 'Failed to scan QR code', false);
+    }
+  ).catch(err => console.error('Error starting QR scanner:', err));
+}
+
 function handleQRUpload(file) {
+  if (!file || !['image/png', 'image/jpeg', 'image/bmp'].includes(file.type)) {
+    showMessage('checkin-message', 'Invalid file type. Please upload a PNG, JPEG, or BMP image.', false);
+    return;
+  }
+
+ 
   const formData = new FormData();
   formData.append('file', file);
-  formData.append('user_id', currentUserId);
 
   fetch('/checkin_qr', {
     method: 'POST',
     body: formData
-  })
-  .then(res => res.json())
-  .then(data => {
-    if (data.status === 'success') {
-      showMessage('checkin-message', 'ثبت حضور با موفقیت انجام شد', true);
-      showCheckout();
-      session_id=data.session_id;
 
-    } else {
-      showMessage('checkin-message', data.message || 'خطا در اسکن QR', false);
-    }
   })
-  .catch(() => showMessage('checkin-message', 'خطا در ارتباط با سرور', false));
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === 'success') {
+        showMessage('checkin-message', 'ثبت حضور با موفقیت انجام شد', true);
+        session_id = data.session_id;
+        showCheckout();
+      } else {
+        showMessage('checkin-message', data.message || 'خطا در اسکن QR', false);
+      }
+    })
+    .catch(err => {
+      console.error('Fetch error:', err);
+      showMessage('checkin-message', 'خطا در ارتباط با سرور', false);
+    });
 }
-
 </script>
-<script>
-let currentUserFullName = '';
-let currentUserStudentNumber = '';
-let currentUserStudentPoint = 0;
-
+ <script>
 window.onload = async function () {
   const res = await fetch('/me');
   const data = await res.json();
@@ -528,10 +588,9 @@ window.onload = async function () {
   currentUserStudentPoint = data.score;
 
   // Now check if the user has an active desk
-  const deskRes = await fetch('/desk-data');
-  const deskData = await deskRes.json();
-
-  if (deskData && deskData.id) {
+  if (data.desk_id) {
+    const deskRes = await fetch('/desk-data');
+    const deskData = await deskRes.json();
     showCheckout(); // Show reserved desk view
   } else {
     showCheckin(); // Show QR check-in scanner
