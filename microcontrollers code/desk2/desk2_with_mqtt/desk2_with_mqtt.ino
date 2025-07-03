@@ -1,11 +1,14 @@
+
+const char* token="uessrljhary9xcwquy28"; // desk2 token
+
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include <Ticker.h>
 
 const char* ssid="IoT net";
 const char* password="IoT_123456";
-const char* mqttServer="mqtt.thingsboard.cloud";
-const char* token="uessrljhary9xcwquy28"; // desk2 token
+const char* mqttServer="thingsboard.cloud";
+const char* token="uessrljhary9xcwquy28"; // desk2 token in thingsboard
 
 // pins
 #define PIR_PIN D1
@@ -15,7 +18,10 @@ const char* token="uessrljhary9xcwquy28"; // desk2 token
 volatile bool deskOccupied=false;
 volatile unsigned long long lastMotionTime=0;
 const unsigned long TIMEOUT=1*60*1000;
+bool timeoutDetected=false;
+bool motionDetected=false;
 const int maxTries=1000;
+int tries=0;
 
 // timer
 Ticker timer;
@@ -26,9 +32,7 @@ PubSubClient client(espClient);
 
 // interrupt handler for PIR sensor
 void ICACHE_RAM_ATTR handlePIR(){
-  if(deskOccupied){
-  lastMotionTime=millis();
-  }
+  motionDetected=true;
 }
 
 
@@ -43,7 +47,6 @@ void setup() {
 
   timer.attach_ms(60000,handleTimeout);
 
-  int tries=0;
   Serial.println("Connecting to ");
   Serial.println(ssid);
   WiFi.begin(ssid,password);
@@ -71,12 +74,15 @@ void loop() {
   }
   client.loop();
 
-  delay(100);
+  if(motionDetected){
+    if(deskOccupied){
+      lastMotionTime=millis();
+  }
+    motionDetected=false;
+  }
 
-}
-
-void handleTimeout(){
-  if(deskOccupied && (millis()-lastMotionTime>TIMEOUT)){
+  if(timeoutDetected){
+    if(deskOccupied && (millis()-lastMotionTime>TIMEOUT)){
     for(int i=0;i<3;i++){
       digitalWrite(BUZZER_PIN,HIGH);
       digitalWrite(LED_PIN,HIGH);
@@ -87,6 +93,15 @@ void handleTimeout(){
     }
     client.publish("v1/devices/me/telemetry","{\"timer\":\"timeout\"}");
   }
+  timeoutDetected=false;
+  }
+
+  delay(100);
+
+}
+
+void handleTimeout(){
+  timeoutDetected=true;
 }
 
 void reconnectMQTT(){
@@ -132,12 +147,3 @@ void callback(char*topic,byte* payload,unsigned int length){
 
   }
 }
-
-
-
-
-
-
-
-
-

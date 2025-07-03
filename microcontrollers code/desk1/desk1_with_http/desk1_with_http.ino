@@ -14,7 +14,7 @@ const char* password="IoT_123456";
 
 volatile bool deskOccupied=false;
 volatile unsigned long lastMotionTime=0;
-volatile unsigned long TIMEOUT=1*60*1000;
+volatile unsigned long TIMEOUT=1*60*1000; // 1 minute timeout for testing but 20 minutes in practical environment
 bool motion_detected=false;
 bool timeout_occurs=false;
 int motion=0;
