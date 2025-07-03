@@ -9,6 +9,8 @@ const char* password="IoT_123456";
 const char* mqttServer="mqtt.thingsboard.cloud";
 const char* token="fTnQJ8tm6XsM8XNQsZyu"; // environment1 token environment1 includes desk1 & desk2
 
+bool soundDetected = false;
+int tries=0;
 const int maxTries=1000;
 
 
@@ -23,12 +25,15 @@ const int maxTries=1000;
 DHT dht(DHT_PIN,DHT_TYPE);
 
 // air quality sensor
-// MQ135 gasSensor = MQ135(MQ135_PIN);
+MQ135 gasSensor = MQ135(MQ135_PIN);
 
 // WiFi
 WiFiClient espClient;
 PubSubClient client(espClient);
 
+void ICACHE_RAM_ATTR handleSoundSensorInterrupt(){
+  soundDetected=true;
+}
 
 void setup() {
   Serial.begin(115200);
@@ -36,11 +41,12 @@ void setup() {
   pinMode(SOUND_PIN,INPUT);
   pinMode(COOLER_LED_PIN,OUTPUT);
   pinMode(HEATER_LED_PIN,OUTPUT);
+  pinMode(DHT_PIN,INPUT_PULLUP);
 
   dht.begin();
 
+  attachInterrupt(digitalPinToInterrupt(SOUND_PIN), handleSoundSensorInterrupt, FALLING);
 
-  int tries=0;
   Serial.println("Connecting to ");
   Serial.println(ssid);
   WiFi.begin(ssid,password);
@@ -67,12 +73,9 @@ void loop() {
   }
   client.loop();
 
-
-  float temperature=dht.readTemperature();
-  float humidity=dht.readHumidity();
-  int airQuality=analogRead(MQ135_PIN);
-  int soundLevel=digitalRead(SOUND_PIN);
-
+  if(soundDetected){
+  // send sound level to server to manage the users' behavior of that environment desks
+  Serial.println("Sound detected!");
   String payload="{";
   payload+="\"tempreture\":"+String(temperature)+",";
   payload+="\"humidity\":"+String(humidity)+",";
@@ -82,9 +85,37 @@ void loop() {
 
   client.publish("v1/devices/me/telemetry",payload.c_str());
 
-  delay(5000);
-}
+  soundDetected=false;
+  }
 
+  float humidity=dht.readHumidity();
+  float temperature=dht.readTemperature();
+  int airQuality=gasSensor.getPPM();
+  
+
+  Serial.println();
+  if(!isnan(temperature)&&!isnan(humidity)){
+  Serial.print("Temperature is ");
+  Serial.println(temperature);
+  Serial.print("Humidity is ");
+  Serial.println(humidity);
+  }
+  Serial.print("Air quality is ");
+  Serial.println(airQuality);
+
+  // turn on cooler or heater
+  if(!isnan(temperature)&&!isnan(humidity)){
+    if(temperature>25){
+      digitalWrite(COOLER_LED_PIN,HIGH);
+    }
+    else if(temperature<15){
+      digitalWrite(HEATER_LED_PIN,HIGH);
+    }
+  }
+
+  delay(2000);
+
+}
 
 
 void reconnectMQTT(){

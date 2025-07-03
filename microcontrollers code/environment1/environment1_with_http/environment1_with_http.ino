@@ -12,6 +12,7 @@ const char* password="IoT_123456";
 
 // environment1 token environment1 includes desk1 & desk2
 
+bool soundDetected = false;
 int tries=0;
 const int maxTries=1000;
 
@@ -23,7 +24,7 @@ const char* serverURL="http://192.168.75.224:5000/sensor-data";
 int httpCode;
 
 
-#define SOUND_PIN D7
+#define SOUND_PIN D1
 #define DHT_PIN D4
 #define COOLER_LED_PIN D5
 #define HEATER_LED_PIN D6
@@ -36,7 +37,9 @@ DHT dht(DHT_PIN,DHT_TYPE);
 // air quality sensor
 MQ135 gasSensor = MQ135(MQ135_PIN);
 
-
+void ICACHE_RAM_ATTR handleSoundSensorInterrupt(){
+  soundDetected=true;
+}
 
 void setup() {
   dht.begin();
@@ -51,6 +54,7 @@ void setup() {
   digitalWrite(COOLER_LED_PIN,LOW);
   digitalWrite(HEATER_LED_PIN,LOW);
 
+  attachInterrupt(digitalPinToInterrupt(SOUND_PIN), handleSoundSensorInterrupt, FALLING);
 
   float ro=gasSensor.getRZero();
   Serial.print("basic amount of RZero: ");
@@ -78,12 +82,31 @@ void setup() {
 
 void loop() {
 
+  if(soundDetected){
+  // send sound level to server to manage the users' behavior of that environment desks
+  Serial.println("Sound detected!");
+  if(WiFi.status()==WL_CONNECTED){
+        jsonData="{\"desk_id\":\"A\",\"token\":\"ghi789\",\"type\":\"sound\"}";
+
+        http.begin(client,serverURL);
+        http.addHeader("Content-Type", "application/json");
+        httpCode=http.POST(jsonData);
+        if(httpCode>=200 && httpCode<300){
+          Serial.print("Sound level status report was successful!\n");
+        }
+        client.stop();
+        http.end();
+        
+    }
+    soundDetected=false;
+  }
+
   float humidity=dht.readHumidity();
   float temperature=dht.readTemperature();
   int airQuality=gasSensor.getPPM();
   //int airQuality=gasSensor.getCorrectedPPM(36, 25);
   //int airQuality=analogRead(A0);
-  float soundLevel=digitalRead(SOUND_PIN);
+  //float soundLevel=digitalRead(SOUND_PIN);
 
   Serial.println();
   if(!isnan(temperature)&&!isnan(humidity)){
@@ -94,12 +117,12 @@ void loop() {
   }
   Serial.print("Air quality is ");
   Serial.println(airQuality);
-  Serial.print("Sound level is ");
-  Serial.println(soundLevel);
+  // Serial.print("Sound level is ");
+  // Serial.println(soundLevel);
 
 
-  Serial.print("dht pin ");
-  Serial.println(digitalRead(DHT_PIN));
+  // Serial.print("dht pin ");
+  // Serial.println(digitalRead(DHT_PIN));
 
 // turn on cooler or heater
 if(!isnan(temperature)&&!isnan(humidity)){
@@ -110,19 +133,7 @@ if(!isnan(temperature)&&!isnan(humidity)){
     digitalWrite(HEATER_LED_PIN,HIGH);
   }
 }
-// send sound level to server to manage the users' behavior of that environment desks
-  if(WiFi.status()==WL_CONNECTED && soundLevel>0){
-        jsonData="{\"type\":\"sound\",\"token\":\"ghi789\"}";
 
-        http.begin(client,serverURL);
-        httpCode=http.POST(jsonData);
-        if(httpCode>0){
-          Serial.print("Sound level status report was successful!\n");
-        }
-        client.stop();
-        http.end();
-        
-    }
 
   delay(2000);
 }
