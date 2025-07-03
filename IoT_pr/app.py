@@ -111,9 +111,7 @@ def checkin_qr():
 
         user = User.query.get(user_id)
 
-
-
-        if desk_id=="1":
+        if desk_id==1:
             desk = Desk.query.get(int(1))
             desk_ip=desk_ip_map['A1']
             token=AUTHORIZED_DEVICES['A1']
@@ -136,7 +134,6 @@ def checkin_qr():
         ses = Session(user_id=user.id, desk_id=desk.id, start_time=datetime.utcnow(),end_time=None)
         db.session.add(ses)
         desk.status = 'occupied'
-        desk.last_present_time = datetime.utcnow()
         db.session.commit()
         return jsonify({'status': 'success', 'message': 'Checked in via QR', 'session_id': ses.id})
 
@@ -265,8 +262,6 @@ def receive_sensor_data():
                 desk_id=id
                 session = Session.query.filter_by(desk_id=desk_id, end_time=None).first()
                 if session:
-                    session.end_time = datetime.utcnow()
-
                     user = User.query.get(session.user_id)
                     if user:
                         user.point = max(user.point - 100, 0)  
@@ -287,25 +282,23 @@ def receive_sensor_data():
                         d_token=AUTHORIZED_DEVICES['A2']
                         d_id='A2'
 
-                    try:
-                        requests.post(f"{ip}/buzz", json={"token": d_token})
-                    except Exception as e:
-                        print(f"Failed to buzz desk {d_id}: {e}")
+#                    try:
+ #                       requests.post(f"{ip}/buzz", json={"token": d_token})
+  #                  except Exception as e:
+   #                     print(f"Failed to buzz desk {d_id}: {e}")
             
                     db.session.commit()
-                    return jsonify({'status': 'success', 'message': 'Alert recorded'})
-                else:
-                    return jsonify({'status': 'fail', 'message': 'No active session'}), 400
-
-            else:
-                temperature = data.get("temperature")
-                ppm = data.get("ppm")
-                for id in [1,2]:
-                    desk_id=id      
-                    desk = Desk.query.get(desk_id)
-                    if desk:
-                        db.session.commit()
-                    return jsonify({'status': 'success', 'message': 'Environment data recorded'})
+                return jsonify({'status': 'success', 'message': 'Alert recorded'})
+        else:
+            temperature = data.get("temperature")
+            ppm = data.get("ppm")
+            for id in [1,2]:
+                desk_id=id      
+                desk = Desk.query.get(desk_id)
+                if desk:
+                    desk.comment = f"Temperature: {temperature}°C, PPM: {ppm}"
+                    db.session.commit()
+            return jsonify({'status': 'success', 'message': 'Environment data recorded'})
 
     except Exception as e:
         return jsonify({'status': 'fail', 'message': str(e)}), 500
@@ -339,8 +332,12 @@ def get_user_desk_data():
     print(result)
     return jsonify(result)    
 
-@app.route('/alerts/<int:user_id>', methods=['GET'])
-def get_user_alerts(user_id):
+@app.route('/alerts', methods=['GET'])
+def get_user_alerts():
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"status": "fail", "message": "Unauthorized"}), 401
+
     sessions = Session.query.filter_by(user_id=user_id).all()
     session_ids = [s.id for s in sessions]
     alerts = Alert.query.filter(Alert.session_id.in_(session_ids)).order_by(Alert.time.desc()).limit(3).all()
@@ -353,8 +350,27 @@ def get_user_alerts(user_id):
             "message": msg,
             "time": alert.time.isoformat()
         })
-
     return jsonify({"alerts": alert_data})
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.clear()  # This clears all session data
+    return jsonify({"message": "Logged out"})
+
+@app.route('/me', methods=['GET'])
+def get_current_user():
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"logged_in": False})
+    
+    user = User.query.get(user_id)
+    return jsonify({
+        "logged_in": True,
+        "user_id": user.id,
+        "full_name": user.full_name,
+        "student_number": user.student_number,
+        "score": user.point
+    })
 
 
 
