@@ -56,9 +56,9 @@ void setup() {
 
   attachInterrupt(digitalPinToInterrupt(SOUND_PIN), handleSoundSensorInterrupt, FALLING);
 
-  float ro=gasSensor.getRZero();
-  Serial.print("basic amount of RZero: ");
-  Serial.println(ro);
+  // float ro=gasSensor.getRZero();
+  // Serial.print("basic amount of RZero: ");
+  // Serial.println(ro);
 
   
   Serial.print("Connecting to ");
@@ -104,9 +104,6 @@ void loop() {
   float humidity=dht.readHumidity();
   float temperature=dht.readTemperature();
   int airQuality=gasSensor.getPPM();
-  //int airQuality=gasSensor.getCorrectedPPM(36, 25);
-  //int airQuality=analogRead(A0);
-  //float soundLevel=digitalRead(SOUND_PIN);
 
   Serial.println();
   if(!isnan(temperature)&&!isnan(humidity)){
@@ -117,12 +114,7 @@ void loop() {
   }
   Serial.print("Air quality is ");
   Serial.println(airQuality);
-  // Serial.print("Sound level is ");
-  // Serial.println(soundLevel);
 
-
-  // Serial.print("dht pin ");
-  // Serial.println(digitalRead(DHT_PIN));
 
 // turn on cooler or heater
 if(!isnan(temperature)&&!isnan(humidity)){
@@ -131,6 +123,10 @@ if(!isnan(temperature)&&!isnan(humidity)){
   }
   else if(temperature<15){
     digitalWrite(HEATER_LED_PIN,HIGH);
+  }
+  else{
+    digitalWrite(COOLER_LED_PIN,LOW);
+    digitalWrite(HEATER_LED_PIN,LOW);
   }
 }
 
