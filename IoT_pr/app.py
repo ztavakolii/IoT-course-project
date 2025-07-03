@@ -124,12 +124,12 @@ def checkin_qr():
         if not user or not desk:
             return jsonify({'status': 'fail', 'message': 'User or Desk not found'}), 404
 
-#        try:
-#           requests.post(f"{desk_ip}/reserve", json={"token": token})
+        try:
+           requests.post(f"{desk_ip}/reserve", json={"token": token})
 
-#        except Exception as e:
-#            print(f"Failed to notify desk {desk_id}: {e}")
-#            return jsonify({'status': 'fail', 'message': str(e)}), 500
+        except Exception as e:
+            print(f"Failed to notify desk {desk_id}: {e}")
+            return jsonify({'status': 'fail', 'message': str(e)}), 500
 
         ses = Session(user_id=user.id, desk_id=desk.id, start_time=datetime.utcnow(),end_time=None)
         db.session.add(ses)
