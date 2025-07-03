@@ -229,9 +229,8 @@ function fetchDeskData() {
         .then(data => {
             if (!data || !data.id) {
                 document.getElementById('desk-data-container').innerHTML = `<p>${data.message || 'میز فعالی یافت نشد'}</p>`;
-                return;
+                                return;
             }
-
             let html = `
                 <table border="1">
                     <tr>
@@ -255,27 +254,31 @@ function fetchDeskData() {
         });
 }
 </script>
-<!-- sweetalert library -->
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 <script>
-function checkAlerts(user_id) {
-  fetch(`/alerts/${user_id}`)
+function checkAlerts() {
+  fetch(`/alerts`)
     .then(res => res.json())
     .then(data => {
       if (data.alerts.length > 0) {
-        data.alerts.forEach(alert => {
+        const lastAlertTime = localStorage.getItem("lastAlertTime");
+        const newest = data.alerts[0];
+
+        if (!lastAlertTime || newest.time > lastAlertTime) {
           Swal.fire({
             icon: 'warning',
             title: 'هشدار انضباطی!',
-            text: alert.message,
+            text: newest.message,
             confirmButtonText: 'فهمیدم'
           });
-        });
+
+          localStorage.setItem("lastAlertTime", newest.time);
+        }
       }
     });
 }
-</script>
 
+</script>
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script>
   let html5QrCode;
@@ -325,10 +328,10 @@ function showCheckout() {
   document.getElementById('user-student-number').textContent = currentUserStudentNumber;
   clearMessages();
   fetchDeskData();
-  
-  setInterval(fetchDeskData, 60000);
+  checkAlerts();
   if (!deskIntervalId) {
     deskIntervalId = setInterval(fetchDeskData, 60000);
+
   }
 }
 
@@ -416,16 +419,24 @@ function showCheckout() {
   }
 
 function logout() {
-  currentUserId = null;
-  currentUserFullName = '';
-  currentUserStudentNumber = '';
+
   
+  fetch("/logout", { method: "POST" })
+    .then(res => res.json())
+    .then(() => {
+      // Clear local state
+      currentUserId = null;
+      currentUserFullName = '';
+      currentUserStudentNumber = '';
+
+      // Clear UI
   document.getElementById('buttons').classList.remove('hidden');
   document.getElementById('user-info').classList.add('hidden');
   showLogin();
-  
-  if (html5QrCode) html5QrCode.stop().catch(() => {});
+  if (html5QrCode) html5QrCode.stop().catch(() => {});      
+  });
 }
+
 
 function checkout() {
   
@@ -496,6 +507,36 @@ function handleQRUpload(file) {
   .catch(() => showMessage('checkin-message', 'خطا در ارتباط با سرور', false));
 }
 
+</script>
+<script>
+let currentUserFullName = '';
+let currentUserStudentNumber = '';
+let currentUserStudentPoint = 0;
+
+window.onload = async function () {
+  const res = await fetch('/me');
+  const data = await res.json();
+
+  if (!data.logged_in) {
+    showLogin();
+    return;
+  }
+
+  // Set current user data
+  currentUserFullName = data.full_name;
+  currentUserStudentNumber = data.student_number;
+  currentUserStudentPoint = data.score;
+
+  // Now check if the user has an active desk
+  const deskRes = await fetch('/desk-data');
+  const deskData = await deskRes.json();
+
+  if (deskData && deskData.id) {
+    showCheckout(); // Show reserved desk view
+  } else {
+    showCheckin(); // Show QR check-in scanner
+  }
+};
 </script>
 
 </body>
