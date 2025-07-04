@@ -146,7 +146,7 @@ def checkin_qr():
         except Exception as e:
            print(f"Failed to notify desk {desk_id}: {e}")
            return jsonify({'status': 'fail', 'message': str(e)}), 500
-        
+           
         ses = Session(user_id=user.id, desk_id=desk.id, start_time=datetime.utcnow(),end_time=None)
         db.session.add(ses)
         desk.status = 'occupied'
@@ -249,9 +249,9 @@ def checkout():
             token=AUTHORIZED_DEVICES['A2']
 
         try:
-            requests.post(f"{desk_ip}/release", json={"token": token})
+           requests.post(f"{desk_ip}/release", json={"token": token})
         except Exception as e:
-            print(f"Failed to notify desk {desk.id}: {e}")
+           print(f"Failed to notify desk {desk.id}: {e}")
     desk.status = 'free'
     user = User.query.get(ses.user_id)
     if user:
@@ -500,6 +500,7 @@ def get_current_user():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
+
 
 
 app.run(host='0.0.0.0',port=5000,debug=True)
