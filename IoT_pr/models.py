@@ -43,13 +43,12 @@ class Session(db.Model):
     is_qr_scanned = db.Column(db.Boolean, default=False)
     has_alerts = db.Column(db.Boolean, default=False)
     point = db.Column(db.Integer, default=0)
-
     user = db.relationship('User', backref='sessions')
     desk = db.relationship('Desk', backref='sessions')
 
 class Alert(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    alert_type = db.Column(db.String(50))  # e.g., 'noise', 'absence'
+    alert_type = db.Column(db.String(50))  # e.g., 'motion'
     desk_id = db.Column(db.Integer, db.ForeignKey('desk.id'), nullable=True)
     session_id = db.Column(db.Integer, db.ForeignKey('session.id'), nullable=True)
     zone_id = db.Column(db.Integer, db.ForeignKey('zone.id'))
@@ -61,10 +60,10 @@ class Alert(db.Model):
 
 class Device(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    kind = db.Column(db.String(50))  # e.g., 'PIR', 'MIC', 'MQ135'
+    kind = db.Column(db.String(50))  
     zone_id = db.Column(db.Integer, db.ForeignKey('zone.id'))
     desk_id = db.Column(db.Integer, db.ForeignKey('desk.id'), nullable=True)
-    status = db.Column(db.String(20))  # e.g., 'online', 'offline'
+    status = db.Column(db.String(20))  
     last_message = db.Column(db.Text)
     last_message_time = db.Column(db.DateTime)
 

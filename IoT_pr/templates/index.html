@@ -96,7 +96,7 @@ button:hover {
     border: 1px solid #ef9a9a;
   }
 .main-box {
-  background-color: rgba(255, 255, 255, 0.9); /* پس‌زمینه روشن و قابل خواندن */
+  background-color: rgba(255, 255, 255, 0.9); 
   padding: 30px;
   border-radius: 16px;
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
@@ -207,7 +207,7 @@ button:hover {
   <h3>ثبت حضور</h3>
   <button onclick="startQRScan()">اسکن کد QR</button>
   <input type="file" accept="image/*" onchange="handleQRUpload(this.files[0])">
-  <div id="qr-reader" style="width:300px; height:300px;"></div>
+  <div id="qr-reader" style="width:300px; height:250px;"></div>
   <button onclick="logout()">خروج</button>
   <p id="checkin-message"></p>
     </div>
@@ -528,9 +528,11 @@ function startQRScan() {
       html5QrCode.stop().then(() => {
         const data = parseQRData(decodedText);
         if (data) {
-          sendCheckinFromQR(data);
+          const formData = new FormData();
+          formData.append('qr_data', `zone:${data.zone};desk:${data.desk}`);
+          submitCheckin(formData);
         } else {
-          showMessage('checkin-message', 'Invalid QR code format', false);
+          showMessage('checkin-message', 'فرمت کد QR نامعتبر است', false);
         }
       }).catch(err => console.error('Error stopping QR scanner:', err));
     },
@@ -543,34 +545,36 @@ function startQRScan() {
 
 function handleQRUpload(file) {
   if (!file || !['image/png', 'image/jpeg', 'image/bmp'].includes(file.type)) {
-    showMessage('checkin-message', 'Invalid file type. Please upload a PNG, JPEG, or BMP image.', false);
+    showMessage('checkin-message', 'فرمت فایل نامعتبر است. لطفا یک تصویر PNG، JPEG یا BMP بارگذاری کنید.', false);
     return;
   }
 
- 
   const formData = new FormData();
   formData.append('file', file);
+  submitCheckin(formData);
+}
 
+function submitCheckin(formData) {
   fetch('/checkin_qr', {
     method: 'POST',
     body: formData
-
   })
     .then(res => res.json())
     .then(data => {
       if (data.status === 'success') {
-        showMessage('checkin-message', 'ثبت حضور با موفقیت انجام شد', true);
+        showMessage('checkin-message', ' ثبت حضور با موفقیت انجام شد', true);
         session_id = data.session_id;
         showCheckout();
       } else {
-        showMessage('checkin-message', data.message || 'خطا در اسکن QR', false);
+        showMessage('checkin-message', ` ${data.message || 'خطا در بررسی کد QR'}`, false);
       }
     })
     .catch(err => {
       console.error('Fetch error:', err);
-      showMessage('checkin-message', 'خطا در ارتباط با سرور', false);
+      showMessage('checkin-message', ' خطا در ارتباط با سرور', false);
     });
 }
+
 </script>
  <script>
 window.onload = async function () {

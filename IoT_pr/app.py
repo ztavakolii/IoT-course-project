@@ -3,7 +3,7 @@ from flask_cors import CORS
 from models import db, User, Desk, Session, Alert,Device,Zone
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
-from Qr_code_reader import read_qr
+from Qr_code_reader import read_qr,read_qr_opencv
 import os
 from werkzeug.utils import secure_filename
 import requests
@@ -79,12 +79,10 @@ def login():
 
 @app.route('/checkin_qr', methods=['POST'])
 def checkin_qr():
-    # Validate user_id
     user_id = session.get('user_id')
     if not user_id :
         return jsonify({'status': 'fail', 'message': 'Invalid or missing user_id'}), 400
 
-    # Check if user exists
     user = User.query.get(int(user_id))
     if not user:
         return jsonify({'status': 'fail', 'message': 'User not found'}), 404
@@ -100,6 +98,8 @@ def checkin_qr():
         try:
             file.save(filepath)
             qr_data = read_qr(filepath)
+            if not qr_data:
+                qr_data=read_qr_opencv(filepath)
         finally:
             if os.path.exists(filepath):
                 os.remove(filepath)
@@ -161,71 +161,6 @@ def checkin_qr():
         return jsonify({'status': 'fail', 'message': str(e)}), 500
         
 
-# @app.route('/checkin_qr', methods=['POST'])
-# def checkin_qr():
-#     user_id = request.form.get('user_id')
-#     qr_data = None
-
-#     if 'qr_data' in request.form:
-#         qr_data = request.form['qr_data']
-#     elif 'file' in request.files:
-#         file = request.files['file']
-#         filename = secure_filename(file.filename)
-#         filepath = os.path.join(UPLOAD_FOLDER, filename)
-#         file.save(filepath)
-#         qr_data = read_qr(filepath)
-#         os.remove(filepath)
-#     else:
-#         return jsonify({'status': 'fail', 'message': 'Missing file or qr_data'}), 400
-
-#     if not qr_data:
-#         return jsonify({'status': 'fail', 'message': 'QR code not detected'}), 400
-    
-#     try:
-#         zone, desk_id = None, None
-#         parts = qr_data.split(';')
-#         for part in parts:
-#             key, value = part.split(':')
-#             if key.strip() == 'zone':
-#                 zone = value.strip()
-#             elif key.strip() == 'desk':
-#                 desk_id = value.strip()
-
-#         if not ((desk_id == "1" or desk_id == "2") and zone == "A"):
-#             return jsonify({'status': 'fail', 'message': 'Invalid QR format'}), 400
-
-#         user = User.query.get(user_id)
-
-#         if desk_id==1:
-#             desk = Desk.query.get(int(1))
-#             desk_ip=desk_ip_map['A1']
-#             token=AUTHORIZED_DEVICES['A1']
-#         else:
-#             desk = Desk.query.get(int(2))
-#             desk_ip=desk_ip_map['A2']
-#             token=AUTHORIZED_DEVICES['A2']
-
-#         print(desk,user)
-#         if not user or not desk:
-#             return jsonify({'status': 'fail', 'message': 'User or Desk not found'}), 404
-
-# #        try:
-# #           requests.post(f"{desk_ip}/reserve", json={"token": token})
-
-# #        except Exception as e:
-# #            print(f"Failed to notify desk {desk_id}: {e}")
-# #            return jsonify({'status': 'fail', 'message': str(e)}), 500
-
-#         ses = Session(user_id=user.id, desk_id=desk.id, start_time=datetime.utcnow(),end_time=None)
-#         db.session.add(ses)
-#         desk.status = 'occupied'
-#         db.session.commit()
-#         return jsonify({'status': 'success', 'message': 'Checked in via QR', 'session_id': ses.id})
-
-
-#     except Exception as e:
-#         return jsonify({'status': 'fail', 'message': str(e)}), 500
-
 @app.route('/checkout', methods=['POST'])
 def checkout():
     session_id = session.get("session_id")  
@@ -263,30 +198,6 @@ def checkout():
     session.pop("session_id", None)
 
     return jsonify({'status': 'success', 'message': 'Checked out'})
-
-#@app.route('/violation', methods=['POST'])
-#def add_violation():
-#    data = request.json
-#    user_id = data.get('user_id')
-#    desk_id = data.get('desk_id')
-#    violation_type = data.get('type')
-#   zone_id = data.get('zone_id')
-#    session_id = data.get('session_id')
-
-#    if not user_id or not desk_id or not violation_type or not zone_id:
-#       return jsonify({'status': 'fail', 'message': 'Missing parameters'}), 400
-#
-#    alert = Alert(
-#        alert_type=violation_type,
-#        desk_id=desk_id,
-#        zone_id=zone_id,
-#        session_id=session_id,
-#        time=datetime.utcnow()
-#    )
-#   db.session.add(alert)
-#   db.session.commit()
-#    return jsonify({'status': 'success', 'message': 'Violation recorded'})
-
 @app.route('/sensor-data', methods=['POST'])
 def receive_sensor_data():
     try:
