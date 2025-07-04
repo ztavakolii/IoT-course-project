@@ -140,12 +140,13 @@ def checkin_qr():
         if not user or not desk:
              return jsonify({'status': 'fail', 'message': 'User or Desk not found'}), 404
 
-        #try:
-       #  requests.post(f"{desk_ip}/sound_alert", json={"token": token})
+        try:
+            requests.post(f"{desk_ip}/reserve", json={"token": token})
 
-     ##   except Exception as e:
-      #    print(f"Failed to notify desk {desk_id}: {e}")
-      #    return jsonify({'status': 'fail', 'message': str(e)}), 500
+        except Exception as e:
+           print(f"Failed to notify desk {desk_id}: {e}")
+           return jsonify({'status': 'fail', 'message': str(e)}), 500
+        
         ses = Session(user_id=user.id, desk_id=desk.id, start_time=datetime.utcnow(),end_time=None)
         db.session.add(ses)
         desk.status = 'occupied'
@@ -247,10 +248,10 @@ def checkout():
             desk_ip=desk_ip_map['A2']
             token=AUTHORIZED_DEVICES['A2']
 
-#        try:
-#            requests.post(f"{desk_ip}/sound_alert", json={"token": token})
-#        except Exception as e:
-#            print(f"Failed to notify desk {desk.id}: {e}")
+        try:
+            requests.post(f"{desk_ip}/release", json={"token": token})
+        except Exception as e:
+            print(f"Failed to notify desk {desk.id}: {e}")
     desk.status = 'free'
     user = User.query.get(ses.user_id)
     if user:
@@ -365,7 +366,7 @@ def receive_sensor_data():
                 alerts.append(violation_alert)
                 temp = 1
                 print(f"Alert created: {violation_alert}")
-                if desk_id == 1:
+                if int(desk_id) == 1:
                     ip = desk_ip_map['A1']
                     d_token = AUTHORIZED_DEVICES['A1']
                     d_id = 'A1'
@@ -373,10 +374,10 @@ def receive_sensor_data():
                     ip = desk_ip_map['A2']
                     d_token = AUTHORIZED_DEVICES['A2']
                     d_id = 'A2'            
-#               try:
- #                       requests.post(f"{ip}/sound_alert", json={"token": d_token})
-  #                  except Exception as e:
-   #                     print(f"Failed to buzz desk {d_id}: {e}")
+                try:
+                    requests.post(f"{ip}/sound_alert", json={"token": d_token})
+                except Exception as e:
+                    print(f"Failed to buzz desk {d_id}: {e}")
             
             if alerts:
                     try:
@@ -467,7 +468,7 @@ def logout():
 @app.route('/me', methods=['GET'])
 def get_current_user():
     user_id = session.get("user_id")
-    print(F"user{session.get("user_id")}")
+    print(F'user{session.get("user_id")}')
 
     if not user_id:
         return jsonify({"logged_in": False})
