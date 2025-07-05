@@ -7,6 +7,8 @@ from Qr_code_reader import read_qr,read_qr_opencv
 import os
 from werkzeug.utils import secure_filename
 import requests
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
@@ -147,7 +149,7 @@ def checkin_qr():
            print(f"Failed to notify desk {desk_id}: {e}")
            return jsonify({'status': 'fail', 'message': str(e)}), 500
            
-        ses = Session(user_id=user.id, desk_id=desk.id, start_time=datetime.utcnow(),end_time=None)
+        ses = Session(user_id=user.id, desk_id=desk.id, start_time=datetime.now(ZoneInfo("Asia/Tehran")),end_time=None)
         db.session.add(ses)
         desk.status = 'occupied'
         db.session.commit()
@@ -172,7 +174,7 @@ def checkout():
         return jsonify({'status': 'fail', 'message': 'Session not found'}), 404
 
 
-    ses.end_time = datetime.utcnow()
+    ses.end_time = datetime.now(ZoneInfo("Asia/Tehran"))
     print(ses.end_time)
     desk = Desk.query.get(ses.desk_id)
     if desk:        
@@ -216,11 +218,11 @@ def receive_sensor_data():
         elif desk_id=="A2":
             id=2
         if alert_type == "motion":
-            session = Session.query.filter_by(desk_id=id, end_time=None).first()
-            if session:
-                session.end_time = datetime.utcnow()
-                print(session.user_id)
-                user = User.query.get(session.user_id)
+            sess = Session.query.filter_by(desk_id=id, end_time=None).first()
+            if sess:
+                sess.end_time = datetime.now(ZoneInfo("Asia/Tehran"))
+                print(sess.user_id)
+                user = User.query.get(sess.user_id)
                 if user:
                     user.point = max(user.point - 100, 0)  
                 desk = Desk.query.get(id)
@@ -234,20 +236,22 @@ def receive_sensor_data():
                         desk_ip = desk_ip_map['A2']
                         token = AUTHORIZED_DEVICES['A2']
 
-                    try:
-                        requests.post(f"{desk_ip}/release", json={"token": token})
-                    except Exception as e:
-                        print(f"Failed to notify desk {desk_id}: {e}")
+                    # try:
+                    #     requests.post(f"{desk_ip}/release", json={"token": token})
+                    # except Exception as e:
+                    #     print(f"Failed to notify desk {desk_id}: {e}")
 
                 violation_alert = Alert(
                     alert_type="user_left_without_checkout",
                     desk_id=desk.id,
-                    time=datetime.utcnow(),
-                    session_id=session.id
+                    time=datetime.now(ZoneInfo("Asia/Tehran")),
+                    session_id=sess.id
                 )
                 db.session.add(violation_alert)
                         
                 db.session.commit()
+                session.pop("desk_id", None)
+                session.pop("session_id", None)
                 return jsonify({'status': 'success', 'message': 'Alert recorded'})
             else:
                 return jsonify({'status': 'fail', 'message': 'No active session'}), 400
@@ -271,7 +275,7 @@ def receive_sensor_data():
                 violation_alert = Alert(
                     alert_type="loud_voice",
                     desk_id=desk_id,
-                    time=datetime.utcnow(),
+                    time=datetime.now(ZoneInfo("Asia/Tehran")),
                     session_id=session.id
                 )
                 alerts.append(violation_alert)
@@ -386,7 +390,7 @@ def get_current_user():
 
     user = User.query.get(user_id)
     session_id = session.get("session_id") 
-    print(F"session_id{session.get("session_id")}")
+    print(F'session_id{session.get("session_id")}')
  
     if not session_id:
         return jsonify({
@@ -396,7 +400,7 @@ def get_current_user():
             "score": user.point,
             "desk_id": None 
         })
-    print(F"desk{session.get("desk_id")}")
+    print(F'desk{session.get("desk_id")}')
     return jsonify({
         "logged_in": True,
         "full_name": user.full_name,
@@ -412,6 +416,40 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
 
+    # from app import app, db
+    # from models import Zone, Desk, Device
+
+    # with app.app_context():
+    #     db.drop_all()
+    #     db.create_all()
+
+    #     temp_sensor = Device(kind='Temperature', zone_id=None, status='online')
+    #     sound_sensor = Device(kind='Sound', zone_id=None, status='online')
+    #     pollution_sensor = Device(kind='Air Pollution', zone_id=None, status='online')
+
+    #     db.session.add_all([temp_sensor, sound_sensor, pollution_sensor])
+    #     db.session.commit()  
+
+    #     zone_a = Zone(
+    #         name='A',
+    #         temperature_sensor_id=temp_sensor.id,
+    #         sound_sensor_id=sound_sensor.id,
+    #         pollution_sensor_id=pollution_sensor.id
+    #     )
+    #     db.session.add(zone_a)
+    #     db.session.commit()
+
+    #     desk1 = Desk(id=1, zone_id=zone_a.id, status='free', comment='Desk 1')
+    #     desk2 = Desk(id=2, zone_id=zone_a.id, status='free', comment='Desk 2')
+    #     db.session.add_all([desk1, desk2])
+    #     db.session.commit()
+
+    #     motion1 = Device(kind='Motion', zone_id=zone_a.id, desk_id=desk1.id, status='online')
+    #     motion2 = Device(kind='Motion', zone_id=zone_a.id, desk_id=desk2.id, status='online')
+    #     db.session.add_all([motion1, motion2])
+    #     db.session.commit()
+
+    #     print("Data seeded successfully!")
 
 
 app.run(host='0.0.0.0',port=5000,debug=True)
